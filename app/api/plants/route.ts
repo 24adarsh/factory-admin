@@ -5,16 +5,47 @@ import {
   PutCommand,
   UpdateCommand,
   DeleteCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 
 const TABLE = "Plants";
 
-/* ================= GET ALL PLANTS ================= */
-export async function GET() {
+/**
+ * GET /api/plants
+ * Optional:
+ *   ?name=Pune Plant
+ */
+export async function GET(req: Request) {
   try {
+    const { searchParams } = new URL(req.url);
+    const name = searchParams.get("name");
+
+    /* ✅ Query by name using GSI */
+    if (name) {
+      const data = await db.send(
+        new QueryCommand({
+          TableName: TABLE,
+          IndexName: "name-index",
+          KeyConditionExpression: "#name = :name",
+          ExpressionAttributeNames: {
+            "#name": "name",
+          },
+          ExpressionAttributeValues: {
+            ":name": name,
+          },
+        })
+      );
+
+      return NextResponse.json(data.Items || []);
+    }
+
+    /* ⚠️ Fallback: list all plants */
     const data = await db.send(
-      new ScanCommand({ TableName: TABLE })
+      new ScanCommand({
+        TableName: TABLE,
+        Limit: 50,
+      })
     );
 
     return NextResponse.json(data.Items || []);
