@@ -17,7 +17,7 @@ export default NextAuth({
           return {
             id: "admin",
             name: "Admin",
-            email: credentials?.email,
+            email: credentials!.email,
           };
         }
         return null;
