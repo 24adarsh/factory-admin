@@ -51,3 +51,12 @@ export default function AdminDashboard() {
     </div>
   );
 }
+<button
+  onClick={() => {
+    document.cookie = "admin=; path=/; max-age=0";
+    window.location.href = "/login";
+  }}
+  className="text-sm text-red-500"
+>
+  Logout
+</button>
