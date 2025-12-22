@@ -1,16 +1,20 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { withAuth } from "next-auth/middleware";
 
-export function middleware(req: NextRequest) {
-  const isAdmin = req.cookies.get("admin")?.value === "true";
-
-  if (!isAdmin && req.nextUrl.pathname.startsWith("/admin")) {
-    return NextResponse.redirect(new URL("/login", req.url));
+export default withAuth(
+  function middleware(req) {
+    // You can add role checks here later if needed
+  },
+  {
+    callbacks: {
+      authorized: ({ token }) => {
+        // token exists = authenticated
+        return !!token;
+      },
+    },
   }
+);
 
-  return NextResponse.next();
-}
-
+// 🔒 Protect only admin routes
 export const config = {
   matcher: ["/admin/:path*"],
 };
