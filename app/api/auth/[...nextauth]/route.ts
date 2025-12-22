@@ -10,9 +10,21 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
+
       async authorize(credentials) {
+        // 🔒 Guard: ensure env vars exist (prevents Configuration error)
+        if (
+          !process.env.ADMIN_EMAIL ||
+          !process.env.ADMIN_PASSWORD ||
+          !process.env.NEXTAUTH_SECRET
+        ) {
+          console.error("❌ Missing auth environment variables");
+          throw new Error("Auth environment not configured");
+        }
+
         console.log("Authorize called:", credentials);
 
+        // ✅ Admin credentials check
         if (
           credentials?.email === process.env.ADMIN_EMAIL &&
           credentials?.password === process.env.ADMIN_PASSWORD
@@ -20,10 +32,11 @@ export const authOptions: NextAuthOptions = {
           return {
             id: "admin",
             name: "Admin",
-            email: credentials?.email,
+            email: credentials.email,
           };
         }
 
+        // ❌ Invalid credentials
         return null;
       },
     }),
