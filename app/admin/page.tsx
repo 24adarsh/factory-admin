@@ -1,5 +1,8 @@
+"use client";
+
 export default function AdminDashboard() {
   const logout = () => {
+    // Remove admin cookie
     document.cookie = "admin=; path=/; max-age=0";
     window.location.href = "/login";
   };
@@ -17,7 +20,7 @@ export default function AdminDashboard() {
       {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-700/40 backdrop-blur-sm" />
 
-      {/* Grain Effect */}
+      {/* Grain */}
       <div className="grain" />
 
       {/* Content */}
