@@ -1,3 +1,4 @@
+export const runtime = "nodejs";
 export default function AdminDashboard() {
   return (
     <div className="relative h-[calc(100vh-4rem)] rounded-2xl overflow-hidden">

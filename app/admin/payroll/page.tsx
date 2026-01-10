@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+export const runtime = "nodejs";
 
 type Plant = {
   plantId: string;

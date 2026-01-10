@@ -1,8 +1,9 @@
+export const runtime = "nodejs";
 "use client";
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
-export const runtime = "nodejs";
+
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");

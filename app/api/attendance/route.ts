@@ -6,6 +6,7 @@ import {
   ScanCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from 'crypto';
 
 const TABLE = "Attendance";
 
