@@ -1,10 +1,12 @@
+export const runtime = "nodejs";
+
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 
-export default NextAuth({
+const handler = NextAuth({
   providers: [
     CredentialsProvider({
-      name: "Credentials",
+      name: "Admin",
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
@@ -17,7 +19,7 @@ export default NextAuth({
           return {
             id: "admin",
             name: "Admin",
-            email: credentials!.email,
+            email: credentials?.email,
           };
         }
         return null;
@@ -27,3 +29,5 @@ export default NextAuth({
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
 });
+
+export { handler as GET, handler as POST };
