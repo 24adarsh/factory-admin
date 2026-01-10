@@ -3,74 +3,68 @@
 import { signIn } from "next-auth/react";
 import { useState } from "react";
 
-
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const login = async () => {
+  const handleLogin = async () => {
     setLoading(true);
     setError("");
 
     const res = await signIn("credentials", {
       email,
       password,
-      callbackUrl: "/admin",
       redirect: false,
     });
 
-    if (res?.error) {
+    if (!res || res.error) {
       setError("Invalid email or password");
       setLoading(false);
+      return;
     }
+
+    window.location.href = "/admin";
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-gray-800">
-      {/* Glow */}
-      <div className="absolute w-[420px] h-[420px] bg-purple-500/20 blur-3xl rounded-full"></div>
-
-      <div className="relative backdrop-blur-xl bg-white/10 border border-white/20 p-8 rounded-2xl shadow-2xl w-[380px]">
-        <h1 className="text-2xl font-bold text-white text-center mb-2">
-          Factory Admin
+      <div className="w-[380px] rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 p-8 shadow-2xl">
+        <h1 className="text-2xl font-bold text-white text-center">
+          FactoryAdmin
         </h1>
         <p className="text-gray-300 text-center mb-6">
-          Sign in to manage operations
+          Admin Login
         </p>
 
         {error && (
-          <div className="bg-red-500/20 text-red-200 text-sm p-2 rounded mb-4 text-center">
+          <div className="mb-4 text-sm text-red-300 bg-red-500/20 p-2 rounded text-center">
             {error}
           </div>
         )}
 
         <input
-          className="w-full mb-4 px-4 py-3 rounded-lg bg-black/40 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          placeholder="Admin Email"
           type="email"
+          placeholder="Admin Email"
+          className="w-full mb-3 px-4 py-3 rounded-lg bg-black/40 text-white border border-white/10"
           onChange={(e) => setEmail(e.target.value)}
         />
 
         <input
-          className="w-full mb-6 px-4 py-3 rounded-lg bg-black/40 text-white placeholder-gray-400 border border-white/10 focus:outline-none focus:ring-2 focus:ring-purple-500"
-          placeholder="Password"
           type="password"
+          placeholder="Password"
+          className="w-full mb-5 px-4 py-3 rounded-lg bg-black/40 text-white border border-white/10"
           onChange={(e) => setPassword(e.target.value)}
         />
 
         <button
-          onClick={login}
+          onClick={handleLogin}
           disabled={loading}
-          className="w-full py-3 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold tracking-wide hover:opacity-90 transition disabled:opacity-50"
+          className="w-full py-3 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold disabled:opacity-60"
         >
           {loading ? "Signing in..." : "Login"}
         </button>
-
-        <p className="text-xs text-gray-400 text-center mt-6">
-          Authorized access only
-        </p>
       </div>
     </div>
   );
