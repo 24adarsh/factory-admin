@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-export const runtime = "nodejs";
+import { useEffect, useState } from "react";
 
 type Plant = {
   plantId: string;
@@ -13,10 +12,10 @@ type Employee = {
   name: string;
   plantId: string;
   dailySalary: number;
+  createdAt: string;
 };
 
 export default function EmployeesPage() {
-  // TEMP plants (later from backend)
   const [plants] = useState<Plant[]>([
     { plantId: "P1", name: "Pune Plant" },
     { plantId: "P2", name: "Mumbai Plant" },
@@ -26,18 +25,45 @@ export default function EmployeesPage() {
   const [name, setName] = useState("");
   const [plantId, setPlantId] = useState("");
   const [dailySalary, setDailySalary] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const addEmployee = () => {
-    if (!name || !plantId || !dailySalary) return;
+  // 🔥 Load from DynamoDB
+  useEffect(() => {
+    fetch("/api/employees")
+      .then((res) => res.json())
+      .then(setEmployees)
+      .catch(() => alert("Failed to load employees"));
+  }, []);
 
-    const newEmployee: Employee = {
-      employeeId: Date.now().toString(),
-      name,
-      plantId,
-      dailySalary: Number(dailySalary),
-    };
+  const addEmployee = async () => {
+    if (!name || !plantId || !dailySalary) {
+      alert("Fill all fields");
+      return;
+    }
 
-    setEmployees([...employees, newEmployee]);
+    setLoading(true);
+
+    const res = await fetch("/api/employees", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name,
+        plantId,
+        dailySalary: Number(dailySalary),
+      }),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || "Failed to save employee");
+      return;
+    }
+
+    const saved = await res.json();
+    setEmployees((prev) => [...prev, saved]);
+
     setName("");
     setPlantId("");
     setDailySalary("");
@@ -85,9 +111,10 @@ export default function EmployeesPage() {
 
           <button
             onClick={addEmployee}
+            disabled={loading}
             className="bg-gray-900 text-white rounded px-4"
           >
-            Add
+            {loading ? "Saving..." : "Add"}
           </button>
         </div>
       </div>
@@ -101,13 +128,14 @@ export default function EmployeesPage() {
               <th className="text-left p-3">Name</th>
               <th className="text-left p-3">Plant</th>
               <th className="text-left p-3">Daily Salary</th>
+              <th className="text-left p-3">Created</th>
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 && (
               <tr>
-                <td colSpan={4} className="p-4 text-center text-gray-500">
-                  No employees added yet
+                <td colSpan={5} className="p-4 text-center text-gray-500">
+                  No employees found
                 </td>
               </tr>
             )}
@@ -118,6 +146,9 @@ export default function EmployeesPage() {
                 <td className="p-3">{emp.name}</td>
                 <td className="p-3">{getPlantName(emp.plantId)}</td>
                 <td className="p-3">₹{emp.dailySalary}</td>
+                <td className="p-3">
+                  {new Date(emp.createdAt).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>

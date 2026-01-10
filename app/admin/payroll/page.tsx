@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-export const runtime = "nodejs";
+import { useEffect, useState } from "react";
 
 type Plant = {
   plantId: string;
@@ -16,84 +15,52 @@ type Employee = {
 };
 
 type Attendance = {
-  date: string;
-  plantId: string;
   employeeId: string;
+  plantId: string;
+  date: string;
   multiplier: number;
 };
 
 export default function PayrollPage() {
-  // TEMP data (later from backend)
   const [plants] = useState<Plant[]>([
     { plantId: "P1", name: "Pune Plant" },
     { plantId: "P2", name: "Mumbai Plant" },
   ]);
 
-  const [employees] = useState<Employee[]>([
-    {
-      employeeId: "E1",
-      name: "Amit Patil",
-      plantId: "P1",
-      dailySalary: 1000,
-    },
-    {
-      employeeId: "E2",
-      name: "Rahul Sharma",
-      plantId: "P2",
-      dailySalary: 1200,
-    },
-  ]);
-
-  const [attendance] = useState<Attendance[]>([
-    {
-      date: "2025-01-01",
-      plantId: "P1",
-      employeeId: "E1",
-      multiplier: 1,
-    },
-    {
-      date: "2025-01-02",
-      plantId: "P1",
-      employeeId: "E1",
-      multiplier: 2,
-    },
-  ]);
-
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [plantId, setPlantId] = useState("");
   const [month, setMonth] = useState("");
 
-  const filteredEmployees = employees.filter(
-    (e) => e.plantId === plantId
-  );
+  // load real data
+  useEffect(() => {
+    fetch("/api/employees").then(r => r.json()).then(setEmployees);
+    fetch("/api/attendance").then(r => r.json()).then(setAttendance);
+  }, []);
 
-  const calculateSalary = (employeeId: string, dailySalary: number) => {
-    return attendance
-      .filter(
-        (a) =>
-          a.employeeId === employeeId &&
-          a.plantId === plantId &&
-          a.date.startsWith(month)
-      )
-      .reduce(
-        (total, record) =>
-          total + dailySalary * record.multiplier,
-        0
-      );
-  };
+  const filteredEmployees = employees.filter(e => e.plantId === plantId);
 
-  const getTotalShifts = (employeeId: string) =>
+  const getRecords = (empId: string) =>
     attendance.filter(
-      (a) =>
-        a.employeeId === employeeId &&
+      a =>
+        a.employeeId === empId &&
         a.plantId === plantId &&
         a.date.startsWith(month)
-    ).length;
+    );
+
+  const getTotalShifts = (empId: string) =>
+    getRecords(empId).length;
+
+  const calculateSalary = (empId: string, daily: number) =>
+    getRecords(empId).reduce(
+      (total, r) => total + daily * r.multiplier,
+      0
+    );
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6">Payroll</h2>
 
-      {/* Filters */}
       <div className="bg-white p-4 rounded shadow mb-6 flex gap-4">
         <select
           value={plantId}
@@ -116,7 +83,6 @@ export default function PayrollPage() {
         />
       </div>
 
-      {/* Payroll Table */}
       {plantId && month && (
         <div className="bg-white rounded shadow">
           <table className="w-full border-collapse">
@@ -135,11 +101,7 @@ export default function PayrollPage() {
                     {getTotalShifts(emp.employeeId)}
                   </td>
                   <td className="p-3 font-medium">
-                    ₹
-                    {calculateSalary(
-                      emp.employeeId,
-                      emp.dailySalary
-                    )}
+                    ₹{calculateSalary(emp.employeeId, emp.dailySalary)}
                   </td>
                 </tr>
               ))}

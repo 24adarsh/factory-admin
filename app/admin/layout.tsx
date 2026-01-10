@@ -1,12 +1,10 @@
 import type { ReactNode } from "react";
-export const runtime = "nodejs";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen flex bg-gradient-to-br from-slate-100 to-slate-200">
       {/* Sidebar */}
       <aside className="w-64 bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100 shadow-2xl">
-        {/* Brand */}
         <div className="p-6 border-b border-slate-700">
           <h1 className="text-2xl font-bold tracking-tight text-white">
             Factory<span className="text-indigo-400">Admin</span>
@@ -16,7 +14,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </p>
         </div>
 
-        {/* Navigation */}
         <nav className="p-4 space-y-1 text-sm">
           {[
             { name: "Dashboard", href: "/admin" },
@@ -41,7 +38,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 p-8 text-slate-900">
         {children}
       </main>

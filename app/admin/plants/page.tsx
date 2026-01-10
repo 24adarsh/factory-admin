@@ -1,29 +1,50 @@
 "use client";
 
-import { useState } from "react";
-export const runtime = "nodejs";
+import { useEffect, useState } from "react";
 
 type Plant = {
   plantId: string;
   name: string;
   location: string;
+  createdAt: string;
 };
 
 export default function PlantsPage() {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const addPlant = () => {
+  // 🔥 Load plants from DynamoDB
+  useEffect(() => {
+    fetch("/api/plants")
+      .then((res) => res.json())
+      .then(setPlants)
+      .catch(() => alert("Failed to load plants"));
+  }, []);
+
+  const addPlant = async () => {
     if (!name || !location) return;
 
-    const newPlant: Plant = {
-      plantId: Date.now().toString(),
-      name,
-      location,
-    };
+    setLoading(true);
 
-    setPlants([...plants, newPlant]);
+    const res = await fetch("/api/plants", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, location }),
+    });
+
+    setLoading(false);
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert(err.error || "Failed to save plant");
+      return;
+    }
+
+    const saved = await res.json();
+    setPlants((prev) => [...prev, saved]);
+
     setName("");
     setLocation("");
   };
@@ -32,7 +53,7 @@ export default function PlantsPage() {
     <div>
       <h2 className="text-2xl font-semibold mb-6">Plants</h2>
 
-      {/* Add Plant Form */}
+      {/* Add Plant */}
       <div className="bg-white p-4 rounded shadow mb-6">
         <h3 className="font-medium mb-3">Add New Plant</h3>
 
@@ -53,9 +74,10 @@ export default function PlantsPage() {
 
           <button
             onClick={addPlant}
+            disabled={loading}
             className="bg-gray-900 text-white rounded px-4"
           >
-            Add
+            {loading ? "Saving..." : "Add"}
           </button>
         </div>
       </div>
@@ -68,13 +90,14 @@ export default function PlantsPage() {
               <th className="text-left p-3">Plant ID</th>
               <th className="text-left p-3">Name</th>
               <th className="text-left p-3">Location</th>
+              <th className="text-left p-3">Created</th>
             </tr>
           </thead>
           <tbody>
             {plants.length === 0 && (
               <tr>
-                <td colSpan={3} className="p-4 text-center text-gray-500">
-                  No plants added yet
+                <td colSpan={4} className="p-4 text-center text-gray-500">
+                  No plants found
                 </td>
               </tr>
             )}
@@ -84,6 +107,9 @@ export default function PlantsPage() {
                 <td className="p-3">{plant.plantId}</td>
                 <td className="p-3">{plant.name}</td>
                 <td className="p-3">{plant.location}</td>
+                <td className="p-3">
+                  {new Date(plant.createdAt).toLocaleString()}
+                </td>
               </tr>
             ))}
           </tbody>

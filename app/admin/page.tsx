@@ -1,8 +1,11 @@
-export const runtime = "nodejs";
 export default function AdminDashboard() {
+  const logout = () => {
+    document.cookie = "admin=; path=/; max-age=0";
+    window.location.href = "/login";
+  };
+
   return (
     <div className="relative h-[calc(100vh-4rem)] rounded-2xl overflow-hidden">
-
       {/* Background Image */}
       <div
         className="absolute inset-0 bg-cover bg-center scale-105"
@@ -11,10 +14,10 @@ export default function AdminDashboard() {
         }}
       />
 
-      {/* Gradient Overlay (READABILITY) */}
+      {/* Gradient Overlay */}
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-700/40 backdrop-blur-sm" />
 
-      {/* Grain Effect (LUXURY TOUCH) */}
+      {/* Grain Effect */}
       <div className="grain" />
 
       {/* Content */}
@@ -32,32 +35,25 @@ export default function AdminDashboard() {
           control panel.
         </p>
 
-        {/* Info Cards */}
         <div className="mt-8 grid grid-cols-2 gap-4">
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/10">
             <p className="text-sm text-slate-300">System</p>
-            <p className="text-lg font-semibold">
-              Multi-Plant Admin
-            </p>
+            <p className="text-lg font-semibold">Multi-Plant Admin</p>
           </div>
 
           <div className="bg-white/10 backdrop-blur rounded-xl p-4 border border-white/10">
             <p className="text-sm text-slate-300">Architecture</p>
-            <p className="text-lg font-semibold">
-              Serverless Ready
-            </p>
+            <p className="text-lg font-semibold">Serverless Ready</p>
           </div>
         </div>
+
+        <button
+          onClick={logout}
+          className="mt-8 text-sm text-red-400 hover:text-red-300"
+        >
+          Logout
+        </button>
       </div>
     </div>
   );
 }
-<button
-  onClick={() => {
-    document.cookie = "admin=; path=/; max-age=0";
-    window.location.href = "/login";
-  }}
-  className="text-sm text-red-500"
->
-  Logout
-</button>

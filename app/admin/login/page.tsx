@@ -2,7 +2,6 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-export const runtime = "nodejs";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -30,7 +29,6 @@ export default function LoginPage() {
       return;
     }
 
-    // success → go to admin
     router.push("/admin");
   };
 
@@ -77,7 +75,5 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
-    
   );
 }
-
