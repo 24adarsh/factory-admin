@@ -117,3 +117,18 @@ export async function POST(req: Request) {
     );
   }
 }
+
+
+
+
+
+/* ================= DELETE ATTENDANCE ================= */
+// export async function DELETE(req: Request) {
+//   try {
+//     const { searchParams } = new URL(req.url);
+//     const employeeId = searchParams.get("employeeId");
+//     const date = searchParams.get("date");
+
+
+
+//adarsh
