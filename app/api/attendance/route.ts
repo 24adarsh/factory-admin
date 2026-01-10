@@ -1,4 +1,5 @@
 export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import db from "@/lib/dynamodb";
 import {
@@ -6,40 +7,40 @@ import {
   ScanCommand,
   QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 
 const TABLE = "Attendance";
 
-/* LOCKED SHIFT RULES */
+/* SHIFT MULTIPLIERS */
 const SHIFT_MULTIPLIER: Record<string, number> = {
   DAY: 1.0,
   NIGHT: 1.0,
   HALF: 0.5,
 };
 
-/**
- * GET /api/attendance
- * Optional query params:
- * ?from=YYYY-MM-DD&to=YYYY-MM-DD
- */
+/* ===============================
+   GET /api/attendance
+   ?from=YYYY-MM-DD&to=YYYY-MM-DD
+================================ */
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const from = searchParams.get("from");
     const to = searchParams.get("to");
 
-    /* ✅ If date range provided → use GSI */
+    /* If date range provided → use GSI */
     if (from && to) {
       const data = await db.send(
         new QueryCommand({
           TableName: TABLE,
-          IndexName: "date-index", // GSI
-          KeyConditionExpression: "#date = :date",
+          IndexName: "date-index",
+          KeyConditionExpression: "#date BETWEEN :from AND :to",
           ExpressionAttributeNames: {
             "#date": "date",
           },
           ExpressionAttributeValues: {
-            ":date": from,   // single day only
+            ":from": from,
+            ":to": to,
           },
         })
       );
@@ -47,11 +48,11 @@ export async function GET(req: Request) {
       return NextResponse.json(data.Items || []);
     }
 
-    /* ⚠️ Fallback (safe, but not optimal) */
+    /* Fallback – scan last 100 */
     const data = await db.send(
       new ScanCommand({
         TableName: TABLE,
-        Limit: 50,
+        Limit: 100,
       })
     );
 
@@ -65,9 +66,9 @@ export async function GET(req: Request) {
   }
 }
 
-/**
- * POST /api/attendance
- */
+/* ===============================
+   POST /api/attendance
+================================ */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -79,35 +80,41 @@ export async function POST(req: Request) {
       !body.shiftType
     ) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "employeeId, date, plantId, shiftType required" },
         { status: 400 }
       );
     }
 
-    /* ✅ Enforce multiplier on backend */
     const multiplier =
-      SHIFT_MULTIPLIER[body.shiftType] ?? 1.0;
+      SHIFT_MULTIPLIER[body.shiftType] ?? 1;
 
-    /* ✅ TTL (2 years auto-expiry) */
+    const attendanceId = `ATT#${randomUUID()}`;
+
     const ttl =
-      Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2;
+      Math.floor(Date.now() / 1000) +
+      60 * 60 * 24 * 365 * 2; // 2 years
+
+    const item = {
+      attendanceId,          // PK
+      date: body.date,       // SK
+      employeeId: body.employeeId,
+      plantId: body.plantId,
+      shiftType: body.shiftType,
+      multiplier,
+      createdAt: new Date().toISOString(),
+      ttl,
+    };
+
+    console.log("Saving attendance:", item);
 
     await db.send(
       new PutCommand({
         TableName: TABLE,
-        Item: {
-          employeeId: body.employeeId,
-          date: body.date,
-          plantId: body.plantId,
-          shiftType: body.shiftType,
-          multiplier,
-          createdAt: new Date().toISOString(),
-          ttl, // optional but recommended
-        },
+        Item: item,
       })
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(item);
   } catch (error) {
     console.error("Attendance POST error:", error);
     return NextResponse.json(
@@ -116,8 +123,3 @@ export async function POST(req: Request) {
     );
   }
 }
-
-
-
-
-
