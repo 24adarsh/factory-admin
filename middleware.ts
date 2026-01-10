@@ -7,6 +7,7 @@ export function middleware(request: NextRequest) {
   // Allow public routes
   if (
     pathname === "/login" ||
+    pathname === "/admin/login" ||
     pathname.startsWith("/api") ||
     pathname === "/"
   ) {
