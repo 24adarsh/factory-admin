@@ -2,12 +2,14 @@
 
 import { signIn } from "next-auth/react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -19,13 +21,13 @@ export default function LoginPage() {
       redirect: false,
     });
 
-    if (!res || res.error) {
+    if (res?.error) {
       setError("Invalid email or password");
       setLoading(false);
       return;
     }
 
-    window.location.href = "/admin";
+    router.push("/admin");
   };
 
   return (
@@ -34,9 +36,7 @@ export default function LoginPage() {
         <h1 className="text-2xl font-bold text-white text-center">
           FactoryAdmin
         </h1>
-        <p className="text-gray-300 text-center mb-6">
-          Admin Login
-        </p>
+        <p className="text-gray-300 text-center mb-6">Admin Login</p>
 
         {error && (
           <div className="mb-4 text-sm text-red-300 bg-red-500/20 p-2 rounded text-center">
@@ -48,6 +48,7 @@ export default function LoginPage() {
           type="email"
           placeholder="Admin Email"
           className="w-full mb-3 px-4 py-3 rounded-lg bg-black/40 text-white border border-white/10"
+          value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
 
@@ -55,6 +56,7 @@ export default function LoginPage() {
           type="password"
           placeholder="Password"
           className="w-full mb-5 px-4 py-3 rounded-lg bg-black/40 text-white border border-white/10"
+          value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
 
@@ -65,9 +67,6 @@ export default function LoginPage() {
         >
           {loading ? "Signing in..." : "Login"}
         </button>
-      
-      
-      
       </div>
     </div>
   );
