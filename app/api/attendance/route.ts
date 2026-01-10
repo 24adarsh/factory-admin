@@ -34,13 +34,12 @@ export async function GET(req: Request) {
         new QueryCommand({
           TableName: TABLE,
           IndexName: "date-index", // GSI
-          KeyConditionExpression: "#date BETWEEN :from AND :to",
+          KeyConditionExpression: "#date = :date",
           ExpressionAttributeNames: {
             "#date": "date",
           },
           ExpressionAttributeValues: {
-            ":from": from,
-            ":to": to,
+            ":date": from,   // single day only
           },
         })
       );
@@ -122,13 +121,3 @@ export async function POST(req: Request) {
 
 
 
-/* ================= DELETE ATTENDANCE ================= */
-// export async function DELETE(req: Request) {
-//   try {
-//     const { searchParams } = new URL(req.url);
-//     const employeeId = searchParams.get("employeeId");
-//     const date = searchParams.get("date");
-
-
-
-//adarsh
