@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-export const runtime = "nodejs";
+import { useEffect, useState } from "react";
 
 /* ================= TYPES ================= */
 
@@ -14,7 +13,7 @@ type Employee = {
   employeeId: string;
   name: string;
   plantId: string;
-  dailySalary: number; // for 12 hours
+  dailySalary: number;
 };
 
 type Attendance = {
@@ -24,9 +23,9 @@ type Attendance = {
   employeeId: string;
   shiftType:
     | "DAY_HALF"
-    | "DAY"
+    | "DAY_FULL"
     | "NIGHT_HALF"
-    | "NIGHT"
+    | "NIGHT_FULL"
     | "DAY_NIGHT";
   multiplier: number;
 };
@@ -35,18 +34,18 @@ type Attendance = {
 
 const SHIFTS = {
   DAY_HALF: { label: "Day Half (6 hrs)", multiplier: 0.5 },
-  DAY: { label: "Day Full (12 hrs)", multiplier: 1 },
+  DAY_FULL: { label: "Day Full (12 hrs)", multiplier: 1 },
   NIGHT_HALF: { label: "Night Half (6 hrs)", multiplier: 0.5 },
-  NIGHT: { label: "Night Full (12 hrs)", multiplier: 1 },
+  NIGHT_FULL: { label: "Night Full (12 hrs)", multiplier: 1 },
   DAY_NIGHT: { label: "Day + Night (24 hrs)", multiplier: 2 },
-};
+} as const;
 
-/* ================= TODAY DATE ================= */
+/* ================= TODAY ================= */
 
 const today = new Date().toISOString().split("T")[0];
 
 export default function AttendancePage() {
-  /* ================= TEMP DATA (will be API later) ================= */
+  /* ================= DATA ================= */
 
   const [plants] = useState<Plant[]>([
     { plantId: "P1", name: "Pune Plant" },
@@ -54,33 +53,45 @@ export default function AttendancePage() {
   ]);
 
   const [employees] = useState<Employee[]>([
-    {
-      employeeId: "E1",
-      name: "Amit Patil",
-      plantId: "P1",
-      dailySalary: 1000,
-    },
-    {
-      employeeId: "E2",
-      name: "Rahul Sharma",
-      plantId: "P2",
-      dailySalary: 1200,
-    },
+    { employeeId: "E1", name: "Amit Patil", plantId: "P1", dailySalary: 1000 },
+    { employeeId: "E2", name: "Rahul Sharma", plantId: "P2", dailySalary: 1200 },
   ]);
 
   const [attendance, setAttendance] = useState<Attendance[]>([]);
 
-  /* ================= FORM STATE ================= */
+  /* ================= FORM ================= */
 
   const [plantId, setPlantId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [date, setDate] = useState(today);
   const [shiftType, setShiftType] =
-    useState<Attendance["shiftType"]>("DAY");
-
-  /* ================= TOAST ================= */
+    useState<Attendance["shiftType"]>("DAY_FULL");
 
   const [showToast, setShowToast] = useState(false);
+
+  /* ================= EDIT ================= */
+
+  const [editing, setEditing] = useState<Attendance | null>(null);
+  const [editShift, setEditShift] =
+    useState<Attendance["shiftType"]>("DAY_FULL");
+
+  /* ================= LOAD ================= */
+
+  useEffect(() => {
+    fetch("/api/attendance")
+      .then((r) => r.json())
+      .then((data) => {
+        const mapped: Attendance[] = data.map((a: any) => ({
+          id: a.attendanceId,
+          date: a.date,
+          plantId: a.plantId,
+          employeeId: a.employeeId,
+          shiftType: a.shiftType,
+          multiplier: a.multiplier,
+        }));
+        setAttendance(mapped);
+      });
+  }, []);
 
   /* ================= DERIVED ================= */
 
@@ -88,23 +99,40 @@ export default function AttendancePage() {
     (e) => e.plantId === plantId
   );
 
-  /* ================= ACTIONS ================= */
+  /* ================= SAVE ================= */
 
-  const markAttendance = () => {
+  const markAttendance = async () => {
     if (!plantId || !employeeId) return;
 
+    const res = await fetch("/api/attendance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        plantId,
+        employeeId,
+        date,
+        shift: shiftType,
+      }),
+    });
+
+    if (!res.ok) {
+      alert("Failed to save attendance");
+      return;
+    }
+
+    const saved = await res.json();
+
     const record: Attendance = {
-      id: Date.now().toString(),
-      date,
-      plantId,
-      employeeId,
-      shiftType,
-      multiplier: SHIFTS[shiftType].multiplier,
+      id: saved.attendanceId,
+      date: saved.date,
+      plantId: saved.plantId,
+      employeeId: saved.employeeId,
+      shiftType: saved.shiftType,
+      multiplier: saved.multiplier,
     };
 
     setAttendance((prev) => [...prev, record]);
 
-    // Success toast
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };
@@ -126,7 +154,6 @@ export default function AttendancePage() {
         <h3 className="font-medium mb-4">Mark Attendance</h3>
 
         <div className="grid grid-cols-5 gap-3">
-          {/* Plant */}
           <select
             value={plantId}
             onChange={(e) => {
@@ -143,7 +170,6 @@ export default function AttendancePage() {
             ))}
           </select>
 
-          {/* Employee */}
           <select
             value={employeeId}
             onChange={(e) => setEmployeeId(e.target.value)}
@@ -157,7 +183,6 @@ export default function AttendancePage() {
             ))}
           </select>
 
-          {/* Date */}
           <input
             type="date"
             value={date}
@@ -165,7 +190,6 @@ export default function AttendancePage() {
             className="border p-2 rounded"
           />
 
-          {/* Shift */}
           <select
             value={shiftType}
             onChange={(e) =>
@@ -180,10 +204,9 @@ export default function AttendancePage() {
             ))}
           </select>
 
-          {/* Save */}
           <button
             onClick={markAttendance}
-            className="bg-slate-900 text-white rounded px-4 hover:bg-slate-800 transition"
+            className="bg-slate-900 text-white rounded px-4 hover:bg-slate-800"
           >
             Save
           </button>
@@ -200,13 +223,14 @@ export default function AttendancePage() {
               <th className="p-3 text-left">Employee</th>
               <th className="p-3 text-left">Shift</th>
               <th className="p-3 text-left">Multiplier</th>
+              <th className="p-3 text-left">Actions</th>
             </tr>
           </thead>
           <tbody>
             {attendance.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-4 text-center text-gray-500">
-                  No attendance marked yet
+                <td colSpan={6} className="p-4 text-center text-gray-500">
+                  No attendance yet
                 </td>
               </tr>
             )}
@@ -218,21 +242,92 @@ export default function AttendancePage() {
                 <td className="p-3">{getEmployeeName(a.employeeId)}</td>
                 <td className="p-3">{SHIFTS[a.shiftType].label}</td>
                 <td className="p-3">{a.multiplier}</td>
+                <td className="p-3">
+                  <button
+                    className="text-indigo-600 hover:underline"
+                    onClick={() => {
+                      setEditing(a);
+                      setEditShift(a.shiftType);
+                    }}
+                  >
+                    Edit
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      {/* ===== SUCCESS TOAST ===== */}
-      {showToast && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <div className="flex items-center gap-3 bg-green-600 text-white px-5 py-3 rounded-xl shadow-lg">
-            <span className="text-lg">✅</span>
-            <span className="font-medium">
-              Attendance saved successfully
-            </span>
+      {/* ===== EDIT MODAL ===== */}
+      {editing && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl w-[360px]">
+            <h3 className="font-semibold mb-4">Edit Attendance</h3>
+
+            <select
+              value={editShift}
+              onChange={(e) =>
+                setEditShift(e.target.value as Attendance["shiftType"])
+              }
+              className="border p-2 w-full rounded mb-4"
+            >
+              {Object.entries(SHIFTS).map(([key, val]) => (
+                <option key={key} value={key}>
+                  {val.label}
+                </option>
+              ))}
+            </select>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setEditing(null)}
+                className="px-4 py-2 border rounded"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={async () => {
+                  const res = await fetch("/api/attendance", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      attendanceId: editing.id,
+                      date: editing.date,
+                      shiftType: editShift,
+                    }),
+                  });
+
+                  if (res.ok) {
+                    setAttendance((prev) =>
+                      prev.map((a) =>
+                        a.id === editing.id
+                          ? {
+                              ...a,
+                              shiftType: editShift,
+                              multiplier: SHIFTS[editShift].multiplier,
+                            }
+                          : a
+                      )
+                    );
+                    setEditing(null);
+                  } else {
+                    alert("Failed to update attendance");
+                  }
+                }}
+                className="bg-indigo-600 text-white px-4 py-2 rounded"
+              >
+                Save
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {showToast && (
+        <div className="fixed bottom-6 right-6 bg-green-600 text-white px-5 py-3 rounded-xl shadow">
+          Attendance saved successfully
         </div>
       )}
     </div>
