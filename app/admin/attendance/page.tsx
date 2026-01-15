@@ -57,6 +57,7 @@ export default function AttendancePage() {
   const [shiftType, setShiftType] =
     useState<Attendance["shiftType"]>("DAY_FULL");
 
+  const [saving, setSaving] = useState(false);
   const [showToast, setShowToast] = useState(false);
 
   const [editing, setEditing] = useState<Attendance | null>(null);
@@ -123,7 +124,9 @@ export default function AttendancePage() {
   /* ================= SAVE ATTENDANCE ================= */
 
   const markAttendance = async () => {
-    if (!plantId || !employeeId) return;
+    if (!plantId || !employeeId || saving) return;
+
+    setSaving(true);
 
     const res = await fetch("/api/attendance", {
       method: "POST",
@@ -135,6 +138,13 @@ export default function AttendancePage() {
         shiftType,
       }),
     });
+
+    setSaving(false);
+
+    if (res.status === 409) {
+      alert("Attendance already marked for this employee on this date");
+      return;
+    }
 
     if (!res.ok) {
       alert("Failed to save attendance");
@@ -169,7 +179,7 @@ export default function AttendancePage() {
       <div className="bg-white p-5 rounded-xl shadow mb-6">
         <h3 className="font-medium mb-4">Mark Attendance</h3>
 
-        <div className="grid grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <select
             value={plantId}
             onChange={(e) => {
@@ -222,15 +232,16 @@ export default function AttendancePage() {
 
           <button
             onClick={markAttendance}
-            className="bg-slate-900 text-white rounded px-4 hover:bg-slate-800"
+            disabled={saving}
+            className="bg-slate-900 text-white rounded px-4 hover:bg-slate-800 disabled:opacity-50"
           >
-            Save
+            {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
 
       {/* ===== TABLE ===== */}
-      <div className="bg-white rounded-xl shadow">
+      <div className="bg-white rounded-xl shadow overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead className="bg-slate-100">
             <tr>
@@ -310,7 +321,6 @@ export default function AttendancePage() {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       attendanceId: editing.id,
-                      date: editing.date,
                       shiftType: editShift,
                     }),
                   });
