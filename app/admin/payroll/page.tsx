@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+/* ================= TYPES ================= */
+
 type Plant = {
   plantId: string;
   name: string;
@@ -15,37 +17,76 @@ type Employee = {
 };
 
 type Attendance = {
+  attendanceId: string;
   employeeId: string;
   plantId: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   multiplier: number;
 };
 
-export default function PayrollPage() {
-  const [plants] = useState<Plant[]>([
-    { plantId: "P1", name: "Pune Plant" },
-    { plantId: "P2", name: "Mumbai Plant" },
-  ]);
+/* ================= COMPONENT ================= */
 
+export default function PayrollPage() {
+  /* ================= STATE ================= */
+
+  const [plants, setPlants] = useState<Plant[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
-  const [plantId, setPlantId] = useState("");
-  const [month, setMonth] = useState("");
 
-  // load real data
+  const [plantId, setPlantId] = useState("");
+  const [month, setMonth] = useState(""); // YYYY-MM
+
+  /* ================= LOAD DATA ================= */
+
   useEffect(() => {
-    fetch("/api/employees").then(r => r.json()).then(setEmployees);
-    fetch("/api/attendance").then(r => r.json()).then(setAttendance);
+    const loadData = async () => {
+      try {
+        const [plantRes, empRes, attRes] = await Promise.all([
+          fetch("/api/plants"),
+          fetch("/api/employees"),
+          fetch("/api/attendance"),
+        ]);
+
+        const plantData = await plantRes.json();
+        const empData = await empRes.json();
+        const attData = await attRes.json();
+
+        setPlants(Array.isArray(plantData) ? plantData : []);
+        setEmployees(Array.isArray(empData) ? empData : []);
+
+        // normalize attendance shape
+        setAttendance(
+          Array.isArray(attData)
+            ? attData.map((a: any) => ({
+              attendanceId: a.attendanceId,
+              employeeId: a.employeeId,
+              plantId: a.plantId,
+              date: a.date,
+              multiplier: a.multiplier,
+            }))
+            : []
+        );
+      } catch (err) {
+        console.error("Payroll load error", err);
+        alert("Failed to load payroll data");
+      }
+    };
+
+    loadData();
   }, []);
 
-  const filteredEmployees = employees.filter(e => e.plantId === plantId);
+  /* ================= DERIVED ================= */
+
+  const filteredEmployees = employees.filter(
+    (e) => e.plantId === plantId
+  );
 
   const getRecords = (empId: string) =>
     attendance.filter(
-      a =>
+      (a) =>
         a.employeeId === empId &&
         a.plantId === plantId &&
-        a.date.startsWith(month)
+        a.date.startsWith(month) // YYYY-MM match
     );
 
   const getTotalShifts = (empId: string) =>
@@ -57,10 +98,13 @@ export default function PayrollPage() {
       0
     );
 
+  /* ================= UI ================= */
+
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6">Payroll</h2>
 
+      {/* ===== FILTERS ===== */}
       <div className="bg-white p-4 rounded shadow mb-6 flex gap-4">
         <select
           value={plantId}
@@ -83,6 +127,7 @@ export default function PayrollPage() {
         />
       </div>
 
+      {/* ===== PAYROLL TABLE ===== */}
       {plantId && month && (
         <div className="bg-white rounded shadow">
           <table className="w-full border-collapse">
@@ -94,6 +139,17 @@ export default function PayrollPage() {
               </tr>
             </thead>
             <tbody>
+              {filteredEmployees.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="p-4 text-center text-gray-500"
+                  >
+                    No employees found
+                  </td>
+                </tr>
+              )}
+
               {filteredEmployees.map((emp) => (
                 <tr key={emp.employeeId} className="border-t">
                   <td className="p-3">{emp.name}</td>

@@ -7,58 +7,87 @@ import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 const ATTENDANCE_TABLE = "Attendance";
 const EMPLOYEES_TABLE = "Employees";
 
-// Shift → multiplier (LOCKED RULE)
-const SHIFT_MULTIPLIER: Record<string, number> = {
-  DAY: 1.0,
-  NIGHT: 1.0,
-  HALF: 0.5,
-};
-
-export async function GET() {
+/* ===============================
+   GET /api/payroll?plantId=&month=
+   month = YYYY-MM
+================================ */
+export async function GET(req: Request) {
   try {
-    // 1️⃣ Fetch attendance
+    const { searchParams } = new URL(req.url);
+    const plantId = searchParams.get("plantId");
+    const month = searchParams.get("month"); // YYYY-MM
+
+    if (!plantId || !month) {
+      return NextResponse.json(
+        { error: "plantId and month required" },
+        { status: 400 }
+      );
+    }
+
+    /* 1️⃣ Load attendance */
     const attendanceRes = await db.send(
-      new ScanCommand({ TableName: ATTENDANCE_TABLE })
+      new ScanCommand({
+        TableName: "Attendance",
+        FilterExpression:
+          "plantId = :p AND begins_with(#d, :m)",
+        ExpressionAttributeNames: {
+          "#d": "date",
+        },
+        ExpressionAttributeValues: {
+          ":p": plantId,
+          ":m": month,
+        },
+      })
     );
 
-    // 2️⃣ Fetch employees
+    /* 2️⃣ Load employees */
     const employeesRes = await db.send(
-      new ScanCommand({ TableName: EMPLOYEES_TABLE })
+      new ScanCommand({
+        TableName: "Employees",
+        FilterExpression: "plantId = :p",
+        ExpressionAttributeValues: {
+          ":p": plantId,
+        },
+      })
     );
 
-    const attendance = attendanceRes.Items || [];
-    const employees = employeesRes.Items || [];
+    const attendance = attendanceRes.Items ?? [];
+    const employees = employeesRes.Items ?? [];
 
-    // 3️⃣ Map employees by ID
+    /* 3️⃣ Employee map */
     const employeeMap: Record<string, any> = {};
     for (const emp of employees) {
       employeeMap[emp.employeeId] = emp;
     }
 
-    // 4️⃣ Payroll calculation
-    const payroll = attendance.map((record: any) => {
-      const employee = employeeMap[record.employeeId];
-      const dailySalary = employee?.dailySalary || 0;
+    /* 4️⃣ Group payroll by employee */
+    const payrollMap: Record<string, any> = {};
 
-      const multiplier =
-        SHIFT_MULTIPLIER[record.shiftType] ?? 1.0;
+    for (const record of attendance) {
+      const emp = employeeMap[record.employeeId];
+      if (!emp) continue;
 
-      const pay = dailySalary * multiplier;
+      if (!payrollMap[record.employeeId]) {
+        payrollMap[record.employeeId] = {
+          employeeId: record.employeeId,
+          employeeName: emp.name,
+          dailySalary: emp.dailySalary,
+          totalShifts: 0,
+          totalAmount: 0,
+        };
+      }
 
-      return {
-        employeeId: record.employeeId,
-        employeeName: employee?.name || "Unknown",
-        date: record.date,
-        shiftType: record.shiftType,
-        dailySalary,
-        multiplier,
-        pay,
-      };
-    });
+      payrollMap[record.employeeId].totalShifts += 1;
+      payrollMap[record.employeeId].totalAmount +=
+        emp.dailySalary * record.multiplier;
+    }
 
-    return NextResponse.json(payroll);
+    /* 5️⃣ Return payroll array */
+    return NextResponse.json(
+      Object.values(payrollMap)
+    );
   } catch (error) {
-    console.error("Payroll error:", error);
+    console.error("Payroll GET error:", error);
     return NextResponse.json(
       { error: "Failed to calculate payroll" },
       { status: 500 }

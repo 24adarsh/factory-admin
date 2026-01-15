@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+/* ================= TYPES ================= */
+
 type Plant = {
   plantId: string;
   name: string;
@@ -16,24 +18,42 @@ type Employee = {
 };
 
 export default function EmployeesPage() {
-  const [plants] = useState<Plant[]>([
-    { plantId: "P1", name: "Pune Plant" },
-    { plantId: "P2", name: "Mumbai Plant" },
-  ]);
+  /* ================= STATE ================= */
 
+  const [plants, setPlants] = useState<Plant[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+
   const [name, setName] = useState("");
   const [plantId, setPlantId] = useState("");
   const [dailySalary, setDailySalary] = useState("");
+
   const [loading, setLoading] = useState(false);
 
-  // 🔥 Load from DynamoDB
+  /* ================= LOAD DATA ================= */
+
   useEffect(() => {
-    fetch("/api/employees")
-      .then((res) => res.json())
-      .then(setEmployees)
-      .catch(() => alert("Failed to load employees"));
+    const loadData = async () => {
+      try {
+        const [plantRes, empRes] = await Promise.all([
+          fetch("/api/plants"),
+          fetch("/api/employees"),
+        ]);
+
+        const plantData = await plantRes.json();
+        const empData = await empRes.json();
+
+        setPlants(Array.isArray(plantData) ? plantData : []);
+        setEmployees(Array.isArray(empData) ? empData : []);
+      } catch (err) {
+        console.error("Failed to load data", err);
+        alert("Failed to load plants/employees");
+      }
+    };
+
+    loadData();
   }, []);
+
+  /* ================= ADD EMPLOYEE ================= */
 
   const addEmployee = async () => {
     if (!name || !plantId || !dailySalary) {
@@ -48,7 +68,7 @@ export default function EmployeesPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
-        plantId,
+        plantId, // ✅ REAL plantId (PLANT#uuid)
         dailySalary: Number(dailySalary),
       }),
     });
@@ -69,14 +89,18 @@ export default function EmployeesPage() {
     setDailySalary("");
   };
 
+  /* ================= HELPERS ================= */
+
   const getPlantName = (id: string) =>
-    plants.find((p) => p.plantId === id)?.name || "Unknown";
+    plants.find((p) => p.plantId === id)?.name || "-";
+
+  /* ================= UI ================= */
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6">Employees</h2>
 
-      {/* Add Employee */}
+      {/* ===== ADD EMPLOYEE ===== */}
       <div className="bg-white p-4 rounded shadow mb-6">
         <h3 className="font-medium mb-3">Add Employee</h3>
 
@@ -119,7 +143,7 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Employees Table */}
+      {/* ===== EMPLOYEES TABLE ===== */}
       <div className="bg-white rounded shadow">
         <table className="w-full border-collapse">
           <thead className="bg-gray-100">

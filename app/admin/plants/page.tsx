@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+/* ================= TYPES ================= */
+
 type Plant = {
   plantId: string;
   name: string;
@@ -10,50 +12,73 @@ type Plant = {
 };
 
 export default function PlantsPage() {
+  /* ================= STATE ================= */
+
   const [plants, setPlants] = useState<Plant[]>([]);
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 🔥 Load plants from DynamoDB
+  /* ================= LOAD PLANTS ================= */
+
   useEffect(() => {
-    fetch("/api/plants")
-      .then((res) => res.json())
-      .then(setPlants)
-      .catch(() => alert("Failed to load plants"));
+    const loadPlants = async () => {
+      try {
+        const res = await fetch("/api/plants");
+        const data = await res.json();
+
+        setPlants(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error("Failed to load plants", err);
+        alert("Failed to load plants");
+      }
+    };
+
+    loadPlants();
   }, []);
 
+  /* ================= ADD PLANT ================= */
+
   const addPlant = async () => {
-    if (!name || !location) return;
-
-    setLoading(true);
-
-    const res = await fetch("/api/plants", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, location }),
-    });
-
-    setLoading(false);
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || "Failed to save plant");
+    if (!name || !location) {
+      alert("Fill all fields");
       return;
     }
 
-    const saved = await res.json();
-    setPlants((prev) => [...prev, saved]);
+    setLoading(true);
 
-    setName("");
-    setLocation("");
+    try {
+      const res = await fetch("/api/plants", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, location }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data?.error || "Failed to save plant");
+        return;
+      }
+
+      setPlants((prev) => [...prev, data]);
+      setName("");
+      setLocation("");
+    } catch (err) {
+      console.error("Add plant error", err);
+      alert("Failed to save plant");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  /* ================= UI ================= */
 
   return (
     <div>
       <h2 className="text-2xl font-semibold mb-6">Plants</h2>
 
-      {/* Add Plant */}
+      {/* ===== ADD PLANT ===== */}
       <div className="bg-white p-4 rounded shadow mb-6">
         <h3 className="font-medium mb-3">Add New Plant</h3>
 
@@ -82,7 +107,7 @@ export default function PlantsPage() {
         </div>
       </div>
 
-      {/* Plants Table */}
+      {/* ===== PLANTS TABLE ===== */}
       <div className="bg-white rounded shadow">
         <table className="w-full border-collapse">
           <thead className="bg-gray-100">

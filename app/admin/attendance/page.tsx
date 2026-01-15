@@ -45,21 +45,11 @@ const SHIFTS = {
 const today = new Date().toISOString().split("T")[0];
 
 export default function AttendancePage() {
-  /* ================= DATA ================= */
+  /* ================= STATE ================= */
 
-  const [plants] = useState<Plant[]>([
-    { plantId: "P1", name: "Pune Plant" },
-    { plantId: "P2", name: "Mumbai Plant" },
-  ]);
-
-  const [employees] = useState<Employee[]>([
-    { employeeId: "E1", name: "Amit Patil", plantId: "P1", dailySalary: 1000 },
-    { employeeId: "E2", name: "Rahul Sharma", plantId: "P2", dailySalary: 1200 },
-  ]);
-
+  const [plants, setPlants] = useState<Plant[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
-
-  /* ================= FORM ================= */
 
   const [plantId, setPlantId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
@@ -69,18 +59,41 @@ export default function AttendancePage() {
 
   const [showToast, setShowToast] = useState(false);
 
-  /* ================= EDIT ================= */
-
   const [editing, setEditing] = useState<Attendance | null>(null);
   const [editShift, setEditShift] =
     useState<Attendance["shiftType"]>("DAY_FULL");
 
-  /* ================= LOAD ================= */
+  /* ================= LOAD MASTER DATA ================= */
+
+  useEffect(() => {
+    const loadMasterData = async () => {
+      try {
+        const [plantRes, empRes] = await Promise.all([
+          fetch("/api/plants"),
+          fetch("/api/employees"),
+        ]);
+
+        const plantData = await plantRes.json();
+        const empData = await empRes.json();
+
+        setPlants(Array.isArray(plantData) ? plantData : []);
+        setEmployees(Array.isArray(empData) ? empData : []);
+      } catch (err) {
+        console.error("Failed to load plants/employees", err);
+      }
+    };
+
+    loadMasterData();
+  }, []);
+
+  /* ================= LOAD ATTENDANCE ================= */
 
   useEffect(() => {
     fetch("/api/attendance")
       .then((r) => r.json())
       .then((data) => {
+        if (!Array.isArray(data)) return;
+
         const mapped: Attendance[] = data.map((a: any) => ({
           id: a.attendanceId,
           date: a.date,
@@ -89,8 +102,10 @@ export default function AttendancePage() {
           shiftType: a.shiftType,
           multiplier: a.multiplier,
         }));
+
         setAttendance(mapped);
-      });
+      })
+      .catch((err) => console.error("Attendance load error", err));
   }, []);
 
   /* ================= DERIVED ================= */
@@ -99,7 +114,13 @@ export default function AttendancePage() {
     (e) => e.plantId === plantId
   );
 
-  /* ================= SAVE ================= */
+  const getEmployeeName = (id: string) =>
+    employees.find((e) => e.employeeId === id)?.name || "-";
+
+  const getPlantName = (id: string) =>
+    plants.find((p) => p.plantId === id)?.name || "-";
+
+  /* ================= SAVE ATTENDANCE ================= */
 
   const markAttendance = async () => {
     if (!plantId || !employeeId) return;
@@ -111,7 +132,7 @@ export default function AttendancePage() {
         plantId,
         employeeId,
         date,
-        shift: shiftType,
+        shiftType,
       }),
     });
 
@@ -122,26 +143,21 @@ export default function AttendancePage() {
 
     const saved = await res.json();
 
-    const record: Attendance = {
-      id: saved.attendanceId,
-      date: saved.date,
-      plantId: saved.plantId,
-      employeeId: saved.employeeId,
-      shiftType: saved.shiftType,
-      multiplier: saved.multiplier,
-    };
-
-    setAttendance((prev) => [...prev, record]);
+    setAttendance((prev) => [
+      ...prev,
+      {
+        id: saved.attendanceId,
+        date: saved.date,
+        plantId: saved.plantId,
+        employeeId: saved.employeeId,
+        shiftType: saved.shiftType,
+        multiplier: saved.multiplier,
+      },
+    ]);
 
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
   };
-
-  const getEmployeeName = (id: string) =>
-    employees.find((e) => e.employeeId === id)?.name || "-";
-
-  const getPlantName = (id: string) =>
-    plants.find((p) => p.plantId === id)?.name || "-";
 
   /* ================= UI ================= */
 

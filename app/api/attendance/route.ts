@@ -5,7 +5,6 @@ import db from "@/lib/dynamodb";
 import {
   PutCommand,
   ScanCommand,
-  QueryCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
@@ -25,34 +24,24 @@ const SHIFT_MULTIPLIER: Record<string, number> = {
 
 /* ===============================
    GET /api/attendance
+   (simple + safe)
 ================================ */
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const from = searchParams.get("from");
-    const to = searchParams.get("to");
-
-    if (from && to) {
-      const data = await db.send(
-        new QueryCommand({
-          TableName: TABLE,
-          IndexName: "date-index",
-          KeyConditionExpression: "#date BETWEEN :from AND :to",
-          ExpressionAttributeNames: { "#date": "date" },
-          ExpressionAttributeValues: { ":from": from, ":to": to },
-        })
-      );
-      return NextResponse.json(data.Items || []);
-    }
-
     const data = await db.send(
-      new ScanCommand({ TableName: TABLE, Limit: 100 })
+      new ScanCommand({
+        TableName: TABLE,
+        Limit: 500,
+      })
     );
 
-    return NextResponse.json(data.Items || []);
+    return NextResponse.json(data.Items ?? []);
   } catch (error) {
     console.error("Attendance GET error:", error);
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch attendance" },
+      { status: 500 }
+    );
   }
 }
 
@@ -62,33 +51,54 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const shift = body.shiftType || body.shift;
+    const shiftType = body.shiftType || body.shift;
 
-    if (!body.employeeId || !body.date || !body.plantId || !shift) {
+    if (!body.employeeId || !body.date || !body.plantId || !shiftType) {
       return NextResponse.json(
-        { error: "employeeId, date, plantId, shiftType required" },
+        { error: "employeeId, plantId, date, shiftType required" },
         { status: 400 }
       );
     }
 
-    const multiplier = SHIFT_MULTIPLIER[shift];
+    const multiplier = SHIFT_MULTIPLIER[shiftType];
     if (!multiplier) {
-      return NextResponse.json({ error: "Invalid shift" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid shiftType" },
+        { status: 400 }
+      );
+    }
+
+    /* 🔒 Prevent duplicate attendance */
+    const existing = await db.send(
+      new ScanCommand({
+        TableName: TABLE,
+        FilterExpression:
+          "employeeId = :e AND #d = :d",
+        ExpressionAttributeNames: { "#d": "date" },
+        ExpressionAttributeValues: {
+          ":e": body.employeeId,
+          ":d": body.date,
+        },
+      })
+    );
+
+    if ((existing.Items?.length ?? 0) > 0) {
+      return NextResponse.json(
+        { error: "Attendance already marked for this date" },
+        { status: 409 }
+      );
     }
 
     const attendanceId = `ATT#${randomUUID()}`;
-    const ttl =
-      Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365 * 2;
 
     const item = {
       attendanceId,
-      date: body.date,
       employeeId: body.employeeId,
       plantId: body.plantId,
-      shiftType: shift,
+      date: body.date, // YYYY-MM-DD
+      shiftType,
       multiplier,
       createdAt: new Date().toISOString(),
-      ttl,
     };
 
     await db.send(
@@ -101,7 +111,10 @@ export async function POST(req: Request) {
     return NextResponse.json(item);
   } catch (error) {
     console.error("Attendance POST error:", error);
-    return NextResponse.json({ error: "Failed to save" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to save attendance" },
+      { status: 500 }
+    );
   }
 }
 
@@ -112,21 +125,27 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { attendanceId, date, shiftType } = body;
+    const { attendanceId, shiftType } = body;
 
-    if (!attendanceId || !date || !shiftType) {
+    if (!attendanceId || !shiftType) {
       return NextResponse.json(
-        { error: "attendanceId, date, shiftType required" },
+        { error: "attendanceId and shiftType required" },
         { status: 400 }
       );
     }
 
     const multiplier = SHIFT_MULTIPLIER[shiftType];
+    if (!multiplier) {
+      return NextResponse.json(
+        { error: "Invalid shiftType" },
+        { status: 400 }
+      );
+    }
 
     await db.send(
       new UpdateCommand({
         TableName: TABLE,
-        Key: { attendanceId, date },
+        Key: { attendanceId },
         UpdateExpression:
           "SET shiftType = :s, multiplier = :m, updatedAt = :u",
         ExpressionAttributeValues: {
@@ -141,7 +160,7 @@ export async function PUT(req: Request) {
   } catch (error) {
     console.error("Attendance UPDATE error:", error);
     return NextResponse.json(
-      { error: "Failed to update" },
+      { error: "Failed to update attendance" },
       { status: 500 }
     );
   }

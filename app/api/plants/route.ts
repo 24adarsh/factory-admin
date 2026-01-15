@@ -7,50 +7,24 @@ import {
   PutCommand,
   UpdateCommand,
   DeleteCommand,
-  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 
 const TABLE = "Plants";
 
-/**
- * GET /api/plants
- * Optional:
- *   ?name=Pune Plant
- */
-export async function GET(req: Request) {
+/* ======================================================
+   GET /api/plants
+====================================================== */
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url);
-    const name = searchParams.get("name");
-
-    /* ✅ Query by name using GSI */
-    if (name) {
-      const data = await db.send(
-        new QueryCommand({
-          TableName: TABLE,
-          IndexName: "name-index",
-          KeyConditionExpression: "#name = :name",
-          ExpressionAttributeNames: {
-            "#name": "name",
-          },
-          ExpressionAttributeValues: {
-            ":name": name,
-          },
-        })
-      );
-
-      return NextResponse.json(data.Items || []);
-    }
-
-    /* ⚠️ Fallback: list all plants */
     const data = await db.send(
       new ScanCommand({
         TableName: TABLE,
-        Limit: 50,
+        Limit: 200,
       })
     );
 
-    return NextResponse.json(data.Items || []);
+    return NextResponse.json(data.Items ?? []);
   } catch (error) {
     console.error("GET Plants error:", error);
     return NextResponse.json(
@@ -60,12 +34,15 @@ export async function GET(req: Request) {
   }
 }
 
-/* ================= CREATE PLANT ================= */
+/* ======================================================
+   POST /api/plants
+====================================================== */
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    const name = body.name?.trim();
 
-    if (!body.name) {
+    if (!name) {
       return NextResponse.json(
         { error: "Plant name required" },
         { status: 400 }
@@ -74,8 +51,8 @@ export async function POST(req: Request) {
 
     const item = {
       plantId: `PLANT#${randomUUID()}`,
-      name: body.name,
-      location: body.location || "",
+      name,
+      location: body.location?.trim() ?? "",
       createdAt: new Date().toISOString(),
     };
 
@@ -96,14 +73,39 @@ export async function POST(req: Request) {
   }
 }
 
-/* ================= UPDATE PLANT ================= */
+/* ======================================================
+   PUT /api/plants
+====================================================== */
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
+    const { plantId, name, location } = body;
 
-    if (!body.plantId || !body.name) {
+    if (!plantId) {
       return NextResponse.json(
-        { error: "plantId and name required" },
+        { error: "plantId required" },
+        { status: 400 }
+      );
+    }
+
+    const updates: string[] = [];
+    const values: any = {};
+    const names: any = {};
+
+    if (name) {
+      updates.push("#name = :name");
+      values[":name"] = name.trim();
+      names["#name"] = "name";
+    }
+
+    if (location !== undefined) {
+      updates.push("location = :location");
+      values[":location"] = location.trim();
+    }
+
+    if (updates.length === 0) {
+      return NextResponse.json(
+        { error: "Nothing to update" },
         { status: 400 }
       );
     }
@@ -111,16 +113,10 @@ export async function PUT(req: Request) {
     await db.send(
       new UpdateCommand({
         TableName: TABLE,
-        Key: { plantId: body.plantId },
-        UpdateExpression:
-          "SET #name = :name, location = :location",
-        ExpressionAttributeNames: {
-          "#name": "name",
-        },
-        ExpressionAttributeValues: {
-          ":name": body.name,
-          ":location": body.location || "",
-        },
+        Key: { plantId },
+        UpdateExpression: `SET ${updates.join(", ")}`,
+        ExpressionAttributeNames: names,
+        ExpressionAttributeValues: values,
       })
     );
 
@@ -134,7 +130,10 @@ export async function PUT(req: Request) {
   }
 }
 
-/* ================= DELETE PLANT ================= */
+/* ======================================================
+   DELETE /api/plants?plantId=PLANT#xxx
+   NOTE: Later you should block delete if employees exist
+====================================================== */
 export async function DELETE(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
