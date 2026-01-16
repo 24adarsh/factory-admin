@@ -8,21 +8,33 @@ const handler = NextAuth({
         CredentialsProvider({
             name: "Admin",
             credentials: {
-                email: { label: "Email", type: "email" },
-                password: { label: "Password", type: "password" },
+                email: {
+                    label: "Email",
+                    type: "email",
+                },
+                password: {
+                    label: "Password",
+                    type: "password",
+                },
             },
+
             async authorize(credentials) {
+                if (!credentials?.email || !credentials?.password) {
+                    return null;
+                }
+
                 if (
-                    credentials?.email === process.env.ADMIN_EMAIL &&
-                    credentials?.password === process.env.ADMIN_PASSWORD
+                    credentials.email === process.env.ADMIN_EMAIL &&
+                    credentials.password === process.env.ADMIN_PASSWORD
                 ) {
                     return {
                         id: "admin",
                         name: "Admin",
-                        email: credentials?.email,
+                        email: credentials.email,
                         role: "admin",
                     };
                 }
+
                 return null;
             },
         }),
@@ -39,6 +51,7 @@ const handler = NextAuth({
             }
             return token;
         },
+
         async session({ session, token }) {
             if (session.user) {
                 (session.user as any).role = token.role;
