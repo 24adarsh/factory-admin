@@ -6,6 +6,7 @@ import {
   PutCommand,
   ScanCommand,
   UpdateCommand,
+  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 
@@ -24,7 +25,6 @@ const SHIFT_MULTIPLIER: Record<string, number> = {
 
 /* ===============================
    GET /api/attendance
-   (simple + safe)
 ================================ */
 export async function GET() {
   try {
@@ -53,7 +53,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const shiftType = body.shiftType || body.shift;
 
-    if (!body.employeeId || !body.date || !body.plantId || !shiftType) {
+    if (!body.employeeId || !body.plantId || !body.date || !shiftType) {
       return NextResponse.json(
         { error: "employeeId, plantId, date, shiftType required" },
         { status: 400 }
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
       );
     }
 
-    /* 🔒 Prevent duplicate attendance */
+    // 🔒 Prevent duplicate attendance (same employee + date)
     const existing = await db.send(
       new ScanCommand({
         TableName: TABLE,
@@ -89,13 +89,11 @@ export async function POST(req: Request) {
       );
     }
 
-    const attendanceId = `ATT#${randomUUID()}`;
-
     const item = {
-      attendanceId,
+      attendanceId: `ATT#${randomUUID()}`,
       employeeId: body.employeeId,
       plantId: body.plantId,
-      date: body.date, // YYYY-MM-DD
+      date: body.date,
       shiftType,
       multiplier,
       createdAt: new Date().toISOString(),
@@ -125,7 +123,13 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { attendanceId, shiftType } = body;
+    const { searchParams } = new URL(req.url);
+
+    // ✅ FIX: read from query OR body
+    const attendanceId =
+      searchParams.get("attendanceId") || body.attendanceId;
+
+    const { shiftType } = body;
 
     if (!attendanceId || !shiftType) {
       return NextResponse.json(
@@ -142,7 +146,7 @@ export async function PUT(req: Request) {
       );
     }
 
-    await db.send(
+    const result = await db.send(
       new UpdateCommand({
         TableName: TABLE,
         Key: { attendanceId },
@@ -153,14 +157,47 @@ export async function PUT(req: Request) {
           ":m": multiplier,
           ":u": new Date().toISOString(),
         },
+        ReturnValues: "ALL_NEW",
+      })
+    );
+
+    return NextResponse.json(result.Attributes);
+  } catch (error) {
+    console.error("Attendance PUT error:", error);
+    return NextResponse.json(
+      { error: "Failed to update attendance" },
+      { status: 500 }
+    );
+  }
+}
+
+/* ===============================
+   DELETE /api/attendance
+================================ */
+export async function DELETE(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const attendanceId = searchParams.get("attendanceId");
+
+    if (!attendanceId) {
+      return NextResponse.json(
+        { error: "attendanceId required" },
+        { status: 400 }
+      );
+    }
+
+    await db.send(
+      new DeleteCommand({
+        TableName: TABLE,
+        Key: { attendanceId },
       })
     );
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Attendance UPDATE error:", error);
+    console.error("Attendance DELETE error:", error);
     return NextResponse.json(
-      { error: "Failed to update attendance" },
+      { error: "Failed to delete attendance" },
       { status: 500 }
     );
   }

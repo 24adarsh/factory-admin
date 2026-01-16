@@ -79,7 +79,17 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { plantId, name, location } = body;
+    const { searchParams } = new URL(req.url);
+
+    // ✅ FIX: read plantId from query OR body
+    const plantId =
+      searchParams.get("plantId") || body.plantId;
+
+    const name = body.name?.trim();
+    const location =
+      body.location !== undefined
+        ? body.location.trim()
+        : undefined;
 
     if (!plantId) {
       return NextResponse.json(
@@ -94,13 +104,13 @@ export async function PUT(req: Request) {
 
     if (name) {
       updates.push("#name = :name");
-      values[":name"] = name.trim();
+      values[":name"] = name;
       names["#name"] = "name";
     }
 
     if (location !== undefined) {
       updates.push("location = :location");
-      values[":location"] = location.trim();
+      values[":location"] = location;
     }
 
     if (updates.length === 0) {
@@ -110,17 +120,18 @@ export async function PUT(req: Request) {
       );
     }
 
-    await db.send(
+    const result = await db.send(
       new UpdateCommand({
         TableName: TABLE,
         Key: { plantId },
         UpdateExpression: `SET ${updates.join(", ")}`,
         ExpressionAttributeNames: names,
         ExpressionAttributeValues: values,
+        ReturnValues: "ALL_NEW",
       })
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(result.Attributes);
   } catch (error) {
     console.error("PUT Plant error:", error);
     return NextResponse.json(
@@ -132,7 +143,6 @@ export async function PUT(req: Request) {
 
 /* ======================================================
    DELETE /api/plants?plantId=PLANT#xxx
-   NOTE: Later you should block delete if employees exist
 ====================================================== */
 export async function DELETE(req: Request) {
   try {

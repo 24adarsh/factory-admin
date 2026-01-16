@@ -40,7 +40,6 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-
     const { name, plantId, dailySalary } = body;
 
     if (!name || !plantId || dailySalary === undefined) {
@@ -89,7 +88,13 @@ export async function POST(req: Request) {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const { employeeId, name, plantId, dailySalary } = body;
+    const { searchParams } = new URL(req.url);
+
+    // ✅ FIX: read employeeId from query OR body
+    const employeeId =
+      searchParams.get("employeeId") || body.employeeId;
+
+    const { name, plantId, dailySalary } = body;
 
     if (!employeeId || !name) {
       return NextResponse.json(
@@ -115,17 +120,18 @@ export async function PUT(req: Request) {
       values[":salary"] = salary;
     }
 
-    await db.send(
+    const result = await db.send(
       new UpdateCommand({
         TableName: TABLE,
         Key: { employeeId },
         UpdateExpression: `SET ${updateParts.join(", ")}`,
         ExpressionAttributeNames: names,
         ExpressionAttributeValues: values,
+        ReturnValues: "ALL_NEW",
       })
     );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(result.Attributes);
   } catch (err) {
     console.error("PUT Employee error:", err);
     return NextResponse.json(
