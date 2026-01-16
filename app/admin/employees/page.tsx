@@ -27,6 +27,9 @@ export default function EmployeesPage() {
   const [plantId, setPlantId] = useState("");
   const [dailySalary, setDailySalary] = useState("");
 
+  const [editingEmployeeId, setEditingEmployeeId] =
+    useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
 
   /* ================= LOAD DATA ================= */
@@ -53,9 +56,9 @@ export default function EmployeesPage() {
     loadData();
   }, []);
 
-  /* ================= ADD EMPLOYEE ================= */
+  /* ================= ADD / UPDATE ================= */
 
-  const addEmployee = async () => {
+  const saveEmployee = async () => {
     if (!name || !plantId || !dailySalary) {
       alert("Fill all fields");
       return;
@@ -63,33 +66,88 @@ export default function EmployeesPage() {
 
     setLoading(true);
 
-    const res = await fetch("/api/employees", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        plantId, // ✅ REAL plantId (PLANT#uuid)
-        dailySalary: Number(dailySalary),
-      }),
-    });
+    try {
+      const res = await fetch(
+        editingEmployeeId
+          ? `/api/employees?employeeId=${editingEmployeeId}`
+          : "/api/employees",
+        {
+          method: editingEmployeeId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            plantId,
+            dailySalary: Number(dailySalary),
+          }),
+        }
+      );
 
-    setLoading(false);
+      const data = await res.json();
 
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error || "Failed to save employee");
-      return;
+      if (!res.ok) {
+        alert(data?.error || "Failed to save employee");
+        return;
+      }
+
+      if (editingEmployeeId) {
+        setEmployees((prev) =>
+          prev.map((e) =>
+            e.employeeId === editingEmployeeId ? data : e
+          )
+        );
+      } else {
+        setEmployees((prev) => [...prev, data]);
+      }
+
+      resetForm();
+    } catch (err) {
+      console.error("Save employee error", err);
+      alert("Failed to save employee");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const saved = await res.json();
-    setEmployees((prev) => [...prev, saved]);
+  /* ================= DELETE ================= */
 
+  const deleteEmployee = async (employeeId: string) => {
+    if (!confirm("Delete this employee?")) return;
+
+    try {
+      const res = await fetch(
+        `/api/employees?employeeId=${employeeId}`,
+        { method: "DELETE" }
+      );
+
+      if (!res.ok) {
+        alert("Failed to delete employee");
+        return;
+      }
+
+      setEmployees((prev) =>
+        prev.filter((e) => e.employeeId !== employeeId)
+      );
+    } catch (err) {
+      console.error("Delete employee error", err);
+      alert("Failed to delete employee");
+    }
+  };
+
+  /* ================= HELPERS ================= */
+
+  const startEdit = (emp: Employee) => {
+    setEditingEmployeeId(emp.employeeId);
+    setName(emp.name);
+    setPlantId(emp.plantId);
+    setDailySalary(emp.dailySalary.toString());
+  };
+
+  const resetForm = () => {
+    setEditingEmployeeId(null);
     setName("");
     setPlantId("");
     setDailySalary("");
   };
-
-  /* ================= HELPERS ================= */
 
   const getPlantName = (id: string) =>
     plants.find((p) => p.plantId === id)?.name || "-";
@@ -100,11 +158,13 @@ export default function EmployeesPage() {
     <div>
       <h2 className="text-2xl font-semibold mb-6">Employees</h2>
 
-      {/* ===== ADD EMPLOYEE ===== */}
+      {/* ===== ADD / EDIT EMPLOYEE ===== */}
       <div className="bg-white p-4 rounded shadow mb-6">
-        <h3 className="font-medium mb-3">Add Employee</h3>
+        <h3 className="font-medium mb-3">
+          {editingEmployeeId ? "Edit Employee" : "Add Employee"}
+        </h3>
 
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-5 gap-3">
           <input
             placeholder="Employee Name"
             value={name}
@@ -134,12 +194,25 @@ export default function EmployeesPage() {
           />
 
           <button
-            onClick={addEmployee}
+            onClick={saveEmployee}
             disabled={loading}
             className="bg-gray-900 text-white rounded px-4"
           >
-            {loading ? "Saving..." : "Add"}
+            {loading
+              ? "Saving..."
+              : editingEmployeeId
+                ? "Update"
+                : "Add"}
           </button>
+
+          {editingEmployeeId && (
+            <button
+              onClick={resetForm}
+              className="border rounded px-4"
+            >
+              Cancel
+            </button>
+          )}
         </div>
       </div>
 
@@ -153,12 +226,13 @@ export default function EmployeesPage() {
               <th className="text-left p-3">Plant</th>
               <th className="text-left p-3">Daily Salary</th>
               <th className="text-left p-3">Created</th>
+              <th className="text-left p-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 && (
               <tr>
-                <td colSpan={5} className="p-4 text-center text-gray-500">
+                <td colSpan={6} className="p-4 text-center text-gray-500">
                   No employees found
                 </td>
               </tr>
@@ -172,6 +246,20 @@ export default function EmployeesPage() {
                 <td className="p-3">₹{emp.dailySalary}</td>
                 <td className="p-3">
                   {new Date(emp.createdAt).toLocaleString()}
+                </td>
+                <td className="p-3 space-x-3">
+                  <button
+                    onClick={() => startEdit(emp)}
+                    className="text-blue-600 hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteEmployee(emp.employeeId)}
+                    className="text-red-600 hover:underline"
+                  >
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))}

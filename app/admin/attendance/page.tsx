@@ -74,13 +74,10 @@ export default function AttendancePage() {
           fetch("/api/employees"),
         ]);
 
-        const plantData = await plantRes.json();
-        const empData = await empRes.json();
-
-        setPlants(Array.isArray(plantData) ? plantData : []);
-        setEmployees(Array.isArray(empData) ? empData : []);
+        setPlants(await plantRes.json());
+        setEmployees(await empRes.json());
       } catch (err) {
-        console.error("Failed to load plants/employees", err);
+        console.error("Failed to load master data", err);
       }
     };
 
@@ -95,16 +92,16 @@ export default function AttendancePage() {
       .then((data) => {
         if (!Array.isArray(data)) return;
 
-        const mapped: Attendance[] = data.map((a: any) => ({
-          id: a.attendanceId,
-          date: a.date,
-          plantId: a.plantId,
-          employeeId: a.employeeId,
-          shiftType: a.shiftType,
-          multiplier: a.multiplier,
-        }));
-
-        setAttendance(mapped);
+        setAttendance(
+          data.map((a: any) => ({
+            id: a.attendanceId,
+            date: a.date,
+            plantId: a.plantId,
+            employeeId: a.employeeId,
+            shiftType: a.shiftType,
+            multiplier: a.multiplier,
+          }))
+        );
       })
       .catch((err) => console.error("Attendance load error", err));
   }, []);
@@ -131,18 +128,13 @@ export default function AttendancePage() {
     const res = await fetch("/api/attendance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        plantId,
-        employeeId,
-        date,
-        shiftType,
-      }),
+      body: JSON.stringify({ plantId, employeeId, date, shiftType }),
     });
 
     setSaving(false);
 
     if (res.status === 409) {
-      alert("Attendance already marked for this employee on this date");
+      alert("Attendance already marked");
       return;
     }
 
@@ -167,6 +159,26 @@ export default function AttendancePage() {
 
     setShowToast(true);
     setTimeout(() => setShowToast(false), 2500);
+  };
+
+  /* ================= DELETE ================= */
+
+  const deleteAttendance = async (attendanceId: string) => {
+    if (!confirm("Delete this attendance record?")) return;
+
+    const res = await fetch(
+      `/api/attendance?attendanceId=${attendanceId}`,
+      { method: "DELETE" }
+    );
+
+    if (!res.ok) {
+      alert("Failed to delete attendance");
+      return;
+    }
+
+    setAttendance((prev) =>
+      prev.filter((a) => a.id !== attendanceId)
+    );
   };
 
   /* ================= UI ================= */
@@ -233,7 +245,7 @@ export default function AttendancePage() {
           <button
             onClick={markAttendance}
             disabled={saving}
-            className="bg-slate-900 text-white rounded px-4 hover:bg-slate-800 disabled:opacity-50"
+            className="bg-slate-900 text-white rounded px-4 disabled:opacity-50"
           >
             {saving ? "Saving..." : "Save"}
           </button>
@@ -242,7 +254,7 @@ export default function AttendancePage() {
 
       {/* ===== TABLE ===== */}
       <div className="bg-white rounded-xl shadow overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full text-sm">
           <thead className="bg-slate-100">
             <tr>
               <th className="p-3 text-left">Date</th>
@@ -269,7 +281,7 @@ export default function AttendancePage() {
                 <td className="p-3">{getEmployeeName(a.employeeId)}</td>
                 <td className="p-3">{SHIFTS[a.shiftType].label}</td>
                 <td className="p-3">{a.multiplier}</td>
-                <td className="p-3">
+                <td className="p-3 space-x-3">
                   <button
                     className="text-indigo-600 hover:underline"
                     onClick={() => {
@@ -278,6 +290,12 @@ export default function AttendancePage() {
                     }}
                   >
                     Edit
+                  </button>
+                  <button
+                    className="text-red-600 hover:underline"
+                    onClick={() => deleteAttendance(a.id)}
+                  >
+                    Delete
                   </button>
                 </td>
               </tr>
@@ -309,7 +327,7 @@ export default function AttendancePage() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setEditing(null)}
-                className="px-4 py-2 border rounded"
+                className="border px-4 py-2 rounded"
               >
                 Cancel
               </button>
@@ -325,22 +343,23 @@ export default function AttendancePage() {
                     }),
                   });
 
-                  if (res.ok) {
-                    setAttendance((prev) =>
-                      prev.map((a) =>
-                        a.id === editing.id
-                          ? {
-                              ...a,
-                              shiftType: editShift,
-                              multiplier: SHIFTS[editShift].multiplier,
-                            }
-                          : a
-                      )
-                    );
-                    setEditing(null);
-                  } else {
-                    alert("Failed to update attendance");
+                  if (!res.ok) {
+                    alert("Update failed");
+                    return;
                   }
+
+                  setAttendance((prev) =>
+                    prev.map((a) =>
+                      a.id === editing.id
+                        ? {
+                            ...a,
+                            shiftType: editShift,
+                            multiplier: SHIFTS[editShift].multiplier,
+                          }
+                        : a
+                    )
+                  );
+                  setEditing(null);
                 }}
                 className="bg-indigo-600 text-white px-4 py-2 rounded"
               >
