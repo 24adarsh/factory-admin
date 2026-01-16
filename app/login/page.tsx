@@ -12,22 +12,29 @@ export default function LoginPage() {
   const router = useRouter();
 
   const handleLogin = async () => {
+    if (loading) return;
+
     setLoading(true);
     setError("");
 
-    const res = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    });
+    try {
+      const res = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
 
-    if (res?.error) {
-      setError("Invalid email or password");
+      if (res?.error) {
+        setError("Invalid email or password");
+        setLoading(false);
+        return;
+      }
+
+      router.push("/admin");
+    } catch (err) {
+      setError("Login failed");
       setLoading(false);
-      return;
     }
-
-    router.push("/admin");
   };
 
   return (
